@@ -27,6 +27,9 @@ from app.ai.voice.agents.breeze_buddy.analytics.tracing_setup import (
 from app.ai.voice.agents.breeze_buddy.handlers.internal.end_conversation import (
     end_conversation,
 )
+from app.ai.voice.agents.breeze_buddy.processors.natural_cue_processor import (
+    NaturalCueProcessor,
+)
 from app.ai.voice.agents.breeze_buddy.stt import get_stt_service
 from app.ai.voice.agents.breeze_buddy.template import (
     FlowConfigBuilder,
@@ -314,6 +317,20 @@ class Agent:
             logger.info(f"Using TTS voice from template: {tts_voice_name}")
         tts = await get_tts_service(voice_name=tts_voice_name)
 
+        # Extract natural_cues from template configurations
+        natural_cues = (
+            template.configurations.natural_cues
+            if template and template.configurations
+            else None
+        )
+        if natural_cues:
+            logger.info(f"Natural cues configured: {natural_cues}")
+
+        # Create Natural Cue Processor to play cues when user stops speaking
+        natural_cue_processor = NaturalCueProcessor(
+            transport=self.transport, natural_cues=natural_cues
+        )
+
         self.context = OpenAILLMContext()
         user_params = LLMUserAggregatorParams(
             enable_emulated_vad_interruptions=ENABLE_BREEZE_BUDDY_USER_INTERRUPTION
@@ -322,10 +339,13 @@ class Agent:
             self.context, user_params=user_params
         )
 
+        # Build pipeline with Natural Cue Processor after STT
+        # This ensures cues play immediately when user stops speaking
         pipeline = Pipeline(
             [
                 self.transport.input(),
                 stt,
+                natural_cue_processor,  # Plays cues after user stops speaking
                 context_aggregator.user(),
                 llm,
                 tts,

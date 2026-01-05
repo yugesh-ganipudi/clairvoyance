@@ -23,6 +23,9 @@ class ConfigurationModel(BaseModel):
     tts_voice_name: Optional[TTSVoiceName] = None
     stt_language: Optional[str] = None
     payload_based_language_selection: bool = False
+    natural_cues: Optional[List[str]] = (
+        None  # Audio cues to play after user stops speaking
+    )
 
 
 class FlowAction(BaseModel):
